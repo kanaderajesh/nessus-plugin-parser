@@ -1,0 +1,70 @@
+# Nessus Plugin Output Parser Configuration
+#
+# Structure:
+#   plugins:
+#     - plugin_id: "<nessus plugin ID>"
+#       name:      "<human-readable label>"
+#       fields:
+#         <key>: "<regex with one capture group>"   # simple form
+#         <key>:                                    # extended form
+#           pattern:     "<regex>"
+#           group:       <capture group number, default 1>
+#           multiple:    <true = findall, false = first match>
+#           ignore_case: <true/false>
+#           multiline:   <true/false>
+
+plugins:
+
+  # ── Plugin 10863 – SSL Certificate Information ────────────────────────────
+  - plugin_id: "10863"
+    name: "SSL Certificate Information"
+    fields:
+      # Simple form: value is the regex pattern; group 1 is captured
+      cnname:
+        # Nessus formats the subject block with "Common Name:" labels,
+        # then a second block for the issuer.  Capture the first one (subject).
+        pattern: "Subject Name:[\\s\\S]*?Common Name\\s*:\\s*(.+)"
+        group:   1
+      issuer:
+        pattern: "Issuer Name:[\\s\\S]*?Common Name\\s*:\\s*(.+)"
+        group:   1
+      valid_from: "Not Before\\s*:\\s*(.+)"
+      valid_to:   "Not After\\s*:\\s*(.+)"
+      serial:     "Serial Number\\s*:\\s*([0-9a-fA-F:]+)"
+
+      # Extended form: multiple matches → returns a list
+      san_entries:
+        pattern:   "DNS:([^,\n]+)"
+        group:     1
+        multiple:  true
+
+  # ── Plugin 11936 – OS Identification ──────────────────────────────────────
+  - plugin_id: "11936"
+    name: "OS Identification"
+    fields:
+      os:
+        pattern:     "Remote operating system\\s*:\\s*(.+)"
+        group:       1
+        ignore_case: true
+      confidence:
+        pattern: "Confidence level\\s*:\\s*(\\d+)"
+        group:   1
+
+  # ── Plugin 10180 – Ping the remote host ───────────────────────────────────
+  - plugin_id: "10180"
+    name: "Ping the Remote Host"
+    fields:
+      response_time: "response time\\s*:\\s*([\\d.]+\\s*ms)"
+      icmp_seq:      "icmp_seq=(\\d+)"
+
+  # ── Plugin 19506 – Nessus Scan Information ────────────────────────────────
+  - plugin_id: "19506"
+    name: "Nessus Scan Information"
+    fields:
+      scanner_ip:    "Scanner IP\\s*:\\s*([\\d.]+)"
+      scan_start:    "Scan Start Date\\s*:\\s*(.+)"
+      scan_end:      "Scan End Date\\s*:\\s*(.+)"
+      policy:        "Scan policy used\\s*:\\s*(.+)"
+      nessus_version:
+        pattern: "Nessus version\\s*:\\s*([\\d.]+)"
+        group:   1
