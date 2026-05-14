@@ -27,6 +27,31 @@ Subject Alternative Names:
 Signature Algorithm: SHA-256 With RSA Encryption
 
 
+==== Plugin ID: 10863 (space-separated serial) ====
+Subject Name:
+  Country: US
+  State/Province: New York
+  Locality: New York
+  Organization: Another Corp
+  Organization Unit: Security
+  Common Name: secure.another.com
+
+Issuer Name:
+  Country: US
+  Organization: GlobalSign
+  Common Name: GlobalSign RSA OV SSL CA 2018
+
+Serial Number: 00 D3 9F A4 B8 28 D5 05 27
+
+Not Before: Mar  1 00:00:00 2024 GMT
+Not After : Mar  1 23:59:59 2025 GMT
+
+Subject Alternative Names:
+  DNS:secure.another.com
+
+Signature Algorithm: SHA-256 With RSA Encryption
+
+
 ==== Plugin ID: 11936 ====
 Remote operating system : Linux Kernel 5.15 on Ubuntu 22.04 LTS
 Confidence level        : 95

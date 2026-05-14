@@ -30,7 +30,8 @@ plugins:
         group:   1
       valid_from: "Not Before\\s*:\\s*(.+)"
       valid_to:   "Not After\\s*:\\s*(.+)"
-      serial:     "Serial Number\\s*:\\s*([0-9a-fA-F:]+)"
+      # Matches both colon-separated (0a:1b:2c) and space-separated (00 D3 9F A4) hex bytes
+      serial: "Serial Number\\s*:\\s*([0-9a-fA-F]{2}(?:[: ][0-9a-fA-F]{2})*)"
 
       # Extended form: multiple matches → returns a list
       san_entries:
