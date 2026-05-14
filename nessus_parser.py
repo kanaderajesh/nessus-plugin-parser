@@ -65,6 +65,27 @@ def _build_plugin_index(config: dict) -> dict[str, dict]:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Text helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _collapse_continuation_lines(text: str) -> str:
+    """Join lines that start with whitespace onto the preceding line.
+
+    Nessus sometimes wraps long values (e.g. SHA-256 fingerprints) onto a
+    second line that is indented with leading spaces.  This merges those
+    continuation lines so a single-line regex can match the full value.
+    """
+    lines = text.splitlines()
+    merged: list[str] = []
+    for line in lines:
+        if line and line[0].isspace() and merged:
+            merged[-1] = merged[-1].rstrip() + " " + line.strip()
+        else:
+            merged.append(line)
+    return "\n".join(merged)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Core extraction function
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -113,12 +134,14 @@ def parse_plugin_output(plugin_output: str, plugin_id: str, config: dict) -> dic
             pattern = field_def
             group = 1
             multiple = False
+            collapse_lines = False
             re_flags = 0
         elif isinstance(field_def, dict):
             # Extended form
             pattern = field_def.get("pattern", "")
             group = int(field_def.get("group", 1))
             multiple = bool(field_def.get("multiple", False))
+            collapse_lines = bool(field_def.get("collapse_lines", False))
             re_flags = 0
             if field_def.get("ignore_case", False):
                 re_flags |= re.IGNORECASE
@@ -134,18 +157,21 @@ def parse_plugin_output(plugin_output: str, plugin_id: str, config: dict) -> dic
             results[key] = None
             continue
 
+        # ── Optionally merge wrapped continuation lines ─────────────────────
+        text = _collapse_continuation_lines(plugin_output) if collapse_lines else plugin_output
+
         # ── Apply regex ────────────────────────────────────────────────────
         try:
             if multiple:
                 # Return every non-overlapping capture
-                matches = re.findall(pattern, plugin_output, re_flags)
+                matches = re.findall(pattern, text, re_flags)
                 # re.findall returns strings when there is one group,
                 # tuples when there are multiple groups.
                 if matches and isinstance(matches[0], tuple):
                     matches = [m[group - 1] for m in matches]
                 results[key] = [m.strip() for m in matches]
             else:
-                match = re.search(pattern, plugin_output, re_flags)
+                match = re.search(pattern, text, re_flags)
                 results[key] = match.group(group).strip() if match else None
         except re.error as exc:
             print(f"  [WARNING] Bad regex for key '{key}': {exc}", file=sys.stderr)
@@ -279,10 +305,13 @@ Issuer Name:
   Organization: DigiCert Inc
   Common Name: DigiCert SHA2 Secure Server CA
 
-Serial Number: 0a:1b:2c:3d:4e:5f:6a:7b
+Serial Number: 00 D3 9F A4 B8 28 D5 05 27
 
 Not Before: Jan 10 00:00:00 2024 GMT
 Not After : Jan 10 23:59:59 2025 GMT
+
+SHA-256 Fingerprint: 34 3C 4E 48 E2 E6 84 AF A3 AA B0 02 97 96 63 C7 5B E3 37 25
+                     E7 3D C0 02 A1 2E C0 E1 31 75 34 07
 
 Subject Alternative Names:
   DNS:www.example.com
