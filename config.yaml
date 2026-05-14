@@ -7,12 +7,12 @@
 #       fields:
 #         <key>: "<regex with one capture group>"   # simple form
 #         <key>:                                    # extended form
-#           pattern:       "<regex>"
-#           group:         <capture group number, default 1>
-#           multiple:      <true = findall, false = first match>
-#           ignore_case:   <true/false>
-#           multiline:     <true/false>
-#           collapse_lines: <true = join indented continuation lines before matching>
+#           pattern:             "<regex>"
+#           group:               <capture group number, default 1>
+#           multiple:            <true = findall, false = first match>
+#           ignore_case:         <true/false>
+#           multiline:           <true/false>
+#           normalize_whitespace: <true = collapse internal whitespace in captured value>
 
 plugins:
 
@@ -30,17 +30,19 @@ plugins:
       valid_to:   "Not After\\s*:\\s*(.+)"
       # Matches both colon-separated (0a:1b:2c) and space-separated (00 D3 9F A4) hex bytes
       serial: "Serial Number\\s*:\\s*([0-9a-fA-F]{2}(?:[: ][0-9a-fA-F]{2})*)"
-      # Fingerprint spans two lines; collapse_lines merges them before the regex runs
+      # SHA-256 is always 32 bytes: 20 on line 1, 12 on line 2.
+      # \s+ between the two halves matches the newline + indentation naturally.
+      # normalize_whitespace collapses the internal newline in the captured value.
       fingerprint_sha256:
-        pattern:        "SHA-256 Fingerprint:\\s+([0-9A-Fa-f]{2}(?:\\s+[0-9A-Fa-f]{2})*)"
-        group:          1
-        collapse_lines: true
+        pattern:             "SHA-256 Fingerprint:\\s+([0-9A-Fa-f]{2}(?:[ ][0-9A-Fa-f]{2}){19}\\s+(?:[0-9A-Fa-f]{2}[ ]?){11}[0-9A-Fa-f]{2})"
+        group:               1
+        normalize_whitespace: true
 
       # Extended form: multiple matches → returns a list
       san_entries:
-        pattern:   "DNS:([^,\n]+)"
-        group:     1
-        multiple:  true
+        pattern:  "DNS:([^,\n]+)"
+        group:    1
+        multiple: true
 
   # ── Plugin 11936 – OS Identification ──────────────────────────────────────
   - plugin_id: "11936"

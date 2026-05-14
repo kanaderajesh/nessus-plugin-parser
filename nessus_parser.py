@@ -65,27 +65,6 @@ def _build_plugin_index(config: dict) -> dict[str, dict]:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Text helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _collapse_continuation_lines(text: str) -> str:
-    """Join lines that start with whitespace onto the preceding line.
-
-    Nessus sometimes wraps long values (e.g. SHA-256 fingerprints) onto a
-    second line that is indented with leading spaces.  This merges those
-    continuation lines so a single-line regex can match the full value.
-    """
-    lines = text.splitlines()
-    merged: list[str] = []
-    for line in lines:
-        if line and line[0].isspace() and merged:
-            merged[-1] = merged[-1].rstrip() + " " + line.strip()
-        else:
-            merged.append(line)
-    return "\n".join(merged)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # Core extraction function
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -134,14 +113,14 @@ def parse_plugin_output(plugin_output: str, plugin_id: str, config: dict) -> dic
             pattern = field_def
             group = 1
             multiple = False
-            collapse_lines = False
+            normalize_whitespace = False
             re_flags = 0
         elif isinstance(field_def, dict):
             # Extended form
             pattern = field_def.get("pattern", "")
             group = int(field_def.get("group", 1))
             multiple = bool(field_def.get("multiple", False))
-            collapse_lines = bool(field_def.get("collapse_lines", False))
+            normalize_whitespace = bool(field_def.get("normalize_whitespace", False))
             re_flags = 0
             if field_def.get("ignore_case", False):
                 re_flags |= re.IGNORECASE
@@ -157,22 +136,25 @@ def parse_plugin_output(plugin_output: str, plugin_id: str, config: dict) -> dic
             results[key] = None
             continue
 
-        # ── Optionally merge wrapped continuation lines ─────────────────────
-        text = _collapse_continuation_lines(plugin_output) if collapse_lines else plugin_output
-
         # ── Apply regex ────────────────────────────────────────────────────
         try:
             if multiple:
                 # Return every non-overlapping capture
-                matches = re.findall(pattern, text, re_flags)
+                matches = re.findall(pattern, plugin_output, re_flags)
                 # re.findall returns strings when there is one group,
                 # tuples when there are multiple groups.
                 if matches and isinstance(matches[0], tuple):
                     matches = [m[group - 1] for m in matches]
                 results[key] = [m.strip() for m in matches]
             else:
-                match = re.search(pattern, text, re_flags)
-                results[key] = match.group(group).strip() if match else None
+                match = re.search(pattern, plugin_output, re_flags)
+                if match:
+                    value = match.group(group).strip()
+                    if normalize_whitespace:
+                        value = re.sub(r'\s+', ' ', value)
+                    results[key] = value
+                else:
+                    results[key] = None
         except re.error as exc:
             print(f"  [WARNING] Bad regex for key '{key}': {exc}", file=sys.stderr)
             results[key] = None
