@@ -18,8 +18,8 @@ Serial Number: 0a:1b:2c:3d:4e:5f:6a:7b:8c:9d
 Not Before: Jan 10 00:00:00 2024 GMT
 Not After : Jan 10 23:59:59 2025 GMT
 
-SHA-256 Fingerprint: 34 3C 4E 48 E2 E6 84 AF A3 AA B0 02 97 96 63 C7
-                     5B E3 37 25 E7 3D C0 02 A1 2E C0 E1 31 75 34 07
+SHA-256 Fingerprint: 34 3C 4E 48 E2 E6 84 AF A3 AA B0 02 97 96 63 C7 5B E3 37 25
+                     E7 3D C0 02 A1 2E C0 E1 31 75 34 07
 
 Subject Alternative Names:
   DNS:www.example.com
@@ -49,7 +49,8 @@ Serial Number: 00 D3 9F A4 B8 28 D5 05 27
 Not Before: Mar  1 00:00:00 2024 GMT
 Not After : Mar  1 23:59:59 2025 GMT
 
-SHA-256 Fingerprint: 34 3C 4E 48 E2 E6 84 AF A3 AA B0 02 97 96 63 C7 5B E3 37 25 E7 3D C0 02 A1 2E C0 E1 31 75 34 07
+SHA-256 Fingerprint: 34 3C 4E 48 E2 E6 84 AF A3 AA B0 02 97 96 63 C7 5B E3 37 25
+                     E7 3D C0 02 A1 2E C0 E1 31 75 34 07
 
 Subject Alternative Names:
   DNS:secure.another.com
