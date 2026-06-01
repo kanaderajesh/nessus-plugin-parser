@@ -1,14 +1,15 @@
 # Nessus Plugin Output Parser
 
-A console-based Python tool that extracts structured data from Nessus plugin output text using regex patterns defined in a YAML configuration file.
+A Python tool that extracts structured data from Nessus plugin output text using regex patterns defined in a YAML configuration file. Works as both a **CLI tool** and an **importable library**.
 
 ## Features
 
-- Extract any field from a Nessus plugin output using named regex capture groups
-- YAML-driven configuration — no code changes needed to add or adjust fields
-- Supports both raw plugin text and full `.nessus` XML export files
-- Two field definition styles: a compact single-line form and a full extended form
-- Returns a clean `{key: value}` dictionary from the core function, suitable for use as a library
+- Extract any field from Nessus plugin output using named regex capture groups
+- YAML-driven configuration — add or adjust fields without changing code
+- Supports raw plugin text (file or stdin) and full `.nessus` XML export files
+- Two field definition styles: compact single-line and full extended form
+- Returns a clean `{key: value}` dict from the core function, ready for use as a library
+- Built-in demo mode with sample data for testing
 
 ## Requirements
 
@@ -23,9 +24,9 @@ pip install pyyaml
 
 ```
 .
-├── nessus_parser.py          # Main application and library
-├── config.yaml               # Plugin extraction rules
-├── sample_plugin_outputs.txt # Example plugin output text for testing
+├── nessus_parser.py           # Main application and importable library
+├── config.yaml                # Plugin extraction rules
+├── sample_plugin_outputs.txt  # Example plugin output text for manual testing
 └── README.md
 ```
 
@@ -48,25 +49,31 @@ python nessus_parser.py xml -f report.nessus
 python nessus_parser.py -c my_config.yaml demo
 ```
 
-## Configuration File
+---
 
-`config.yaml` maps plugin IDs to the fields you want to extract. Each field is a named regex pattern that captures the value for that key.
+## Configuration
 
-### Minimal structure
+All extraction rules live in `config.yaml`. No code changes are needed to add, remove, or adjust fields.
+
+### Structure
 
 ```yaml
 plugins:
-  - plugin_id: "10863"
-    name: "SSL Certificate Information"
+  - plugin_id: "<nessus plugin ID>"   # string, must match Nessus output
+    name:      "<human-readable label>"
     fields:
-      cnname:    "Subject Name:[\\s\\S]*?Common Name\\s*:\\s*(.+)"
-      valid_to:  "Not After\\s*:\\s*(.+)"
-      serial:    "Serial Number\\s*:\\s*([0-9a-fA-F:]+)"
+      <key>: "<regex with one capture group>"  # simple form
+      <key>:                                   # extended form
+        pattern:     "<regex>"
+        group:       <capture group number, default 1>
+        multiple:    <true = findall, false = first match only>
+        ignore_case: <true/false>
+        multiline:   <true/false>
 ```
 
-### Field definition: simple form
+### Field Definition — Simple Form
 
-When the value is a plain string, it is treated as a regex pattern. Group 1 is captured and assigned to the key.
+When the value is a plain string it is treated as a regex pattern. Capture group 1 is returned.
 
 ```yaml
 fields:
@@ -74,102 +81,73 @@ fields:
   serial: "Serial Number\\s*:\\s*([0-9a-fA-F:]+)"
 ```
 
-### Field definition: extended form
+### Field Definition — Extended Form
 
-Use a mapping when you need extra options:
+Use a mapping when you need options beyond the defaults:
 
 ```yaml
 fields:
   san_entries:
-    pattern:     "DNS:([^,\n]+)"   # regex with one capture group
-    group:       1                 # which capture group to return (default: 1)
-    multiple:    true              # true = findall (returns a list), false = first match
-    ignore_case: false             # case-insensitive matching (default: false)
-    multiline:   false             # dot matches newline, ^ and $ match line edges (default: false)
+    pattern:     "DNS:([^,\n]+)"  # regex with one capture group
+    group:       1                # which capture group to return (default: 1)
+    multiple:    true             # true = findall (list), false = first match
+    ignore_case: false            # re.IGNORECASE (default: false)
+    multiline:   false            # re.MULTILINE (default: false)
 ```
+
+### Field Options Reference
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `pattern` | string | — | Regex with at least one capture group |
-| `group` | int | `1` | Capture group number to return |
-| `multiple` | bool | `false` | `true` returns all matches as a list |
-| `ignore_case` | bool | `false` | Case-insensitive flag (`re.IGNORECASE`) |
-| `multiline` | bool | `false` | Multiline / dotall flags (`re.MULTILINE`) |
+| `group` | int | `1` | Capture group index to extract |
+| `multiple` | bool | `false` | `true` returns all non-overlapping matches as a list |
+| `ignore_case` | bool | `false` | Enables case-insensitive matching (`re.IGNORECASE`) |
+| `multiline` | bool | `false` | Enables multiline mode (`re.MULTILINE`); `^` and `$` match line edges |
 
-### Return values
+### Return Values
 
 | Scenario | Returned value |
 |---|---|
-| Pattern matched, `multiple: false` | `str` — the captured text, whitespace-stripped |
+| Pattern matched, `multiple: false` | `str` — captured text, whitespace-stripped |
 | Pattern matched, `multiple: true` | `list[str]` — all captures, each stripped |
-| Pattern not found | `None` (simple) or `[]` (multiple) |
+| No match, `multiple: false` | `None` |
+| No match, `multiple: true` | `[]` |
 
-## Using as a Library
+### Example: Adding a New Plugin
 
-The core function can be imported directly into your own scripts:
+1. Find the plugin ID in Nessus (scan results or the plugin library).
+2. Copy a sample of the plugin's raw output text.
+3. Add an entry to `config.yaml`:
 
-```python
-from nessus_parser import load_config, parse_plugin_output
-
-config = load_config("config.yaml")
-
-plugin_output = """
-Subject Name:
-  Common Name: www.example.com
-Issuer Name:
-  Common Name: DigiCert SHA2 Secure Server CA
-Not Before: Jan 10 00:00:00 2024 GMT
-Not After : Jan 10 23:59:59 2025 GMT
-Serial Number: 0a:1b:2c:3d:4e:5f
-"""
-
-result = parse_plugin_output(plugin_output, plugin_id="10863", config=config)
-print(result)
-# {
-#   'cnname':     'www.example.com',
-#   'issuer':     'DigiCert SHA2 Secure Server CA',
-#   'valid_from': 'Jan 10 00:00:00 2024 GMT',
-#   'valid_to':   'Jan 10 23:59:59 2025 GMT',
-#   'serial':     '0a:1b:2c:3d:4e:5f',
-#   'san_entries': []
-# }
+```yaml
+  - plugin_id: "YOUR_PLUGIN_ID"
+    name: "Human Readable Name"
+    fields:
+      field_one: "regex with (one capture group)"
+      field_two:
+        pattern:  "regex with (capture group)"
+        multiple: true
 ```
 
-### `parse_plugin_output` signature
+4. Test with `text` mode:
 
-```python
-def parse_plugin_output(
-    plugin_output: str,
-    plugin_id: str,
-    config: dict,
-) -> dict[str, str | list[str] | None]:
-    ...
+```bash
+cat sample.txt | python nessus_parser.py text -p YOUR_PLUGIN_ID
 ```
 
-Raises `KeyError` if `plugin_id` is not present in the configuration.
+### Built-in Plugins
 
-### Parsing a `.nessus` XML file
+The default `config.yaml` includes rules for four common plugins:
 
-```python
-from nessus_parser import load_config, parse_nessus_xml
+| Plugin ID | Name | Extracted Fields |
+|---|---|---|
+| `10863` | SSL Certificate Information | `cnname`, `issuer`, `valid_from`, `valid_to`, `serial`, `san_entries` |
+| `11936` | OS Identification | `os`, `confidence` |
+| `10180` | Ping the Remote Host | `response_time`, `icmp_seq` |
+| `19506` | Nessus Scan Information | `scanner_ip`, `scan_start`, `scan_end`, `policy`, `nessus_version` |
 
-config  = load_config("config.yaml")
-results = parse_nessus_xml("report.nessus", config)
-
-for r in results:
-    print(r["host"], r["plugin_id"], r["extracted_fields"])
-```
-
-Each entry in the returned list contains:
-
-| Key | Description |
-|---|---|
-| `host` | Hostname from the `<ReportHost>` element |
-| `plugin_id` | Nessus plugin ID string |
-| `plugin_name` | Plugin name from the XML |
-| `port` | Port number |
-| `protocol` | Protocol (tcp / udp) |
-| `extracted_fields` | `dict` of key → value, as returned by `parse_plugin_output` |
+---
 
 ## CLI Reference
 
@@ -193,7 +171,7 @@ options:
 usage: nessus_parser text [-h] -p PLUGIN_ID [-f FILE]
 
 options:
-  -p, --plugin-id   Nessus plugin ID to use for extraction (required)
+  -p, --plugin-id   Nessus plugin ID (required)
   -f, --file        Input file; omit to read from stdin
 ```
 
@@ -206,27 +184,80 @@ options:
   -f, --file   Path to the .nessus XML file (required)
 ```
 
-## Adding a New Plugin
+**demo mode**
 
-1. Find the plugin ID in Nessus (visible in scan results or the plugin library).
-2. Copy a sample of the plugin's output text.
-3. Add a new entry to `config.yaml`:
+Runs against built-in sample data. No input file required. Useful for verifying that your `config.yaml` parses correctly.
 
-```yaml
-  - plugin_id: "YOUR_PLUGIN_ID"
-    name: "Human Readable Name"
-    fields:
-      field_one: "regex with (one capture group)"
-      field_two:
-        pattern:  "regex with (capture group)"
-        multiple: true
+---
+
+## Using as a Library
+
+### Parse a single plugin output
+
+```python
+from nessus_parser import load_config, parse_plugin_output
+
+config = load_config("config.yaml")
+
+plugin_output = """
+Subject Name:
+  Common Name: www.example.com
+Issuer Name:
+  Common Name: DigiCert SHA2 Secure Server CA
+Not Before: Jan 10 00:00:00 2024 GMT
+Not After : Jan 10 23:59:59 2025 GMT
+Serial Number: 0a:1b:2c:3d:4e:5f
+"""
+
+result = parse_plugin_output(plugin_output, plugin_id="10863", config=config)
+print(result)
+# {
+#   'cnname':      'www.example.com',
+#   'issuer':      'DigiCert SHA2 Secure Server CA',
+#   'valid_from':  'Jan 10 00:00:00 2024 GMT',
+#   'valid_to':    'Jan 10 23:59:59 2025 GMT',
+#   'serial':      '0a:1b:2c:3d:4e:5f',
+#   'san_entries': []
+# }
 ```
 
-4. Test with the `text` mode:
+`parse_plugin_output` raises `KeyError` if `plugin_id` is not present in the configuration.
 
-```bash
-cat sample.txt | python nessus_parser.py text -p YOUR_PLUGIN_ID
+### Function signature
+
+```python
+def parse_plugin_output(
+    plugin_output: str,
+    plugin_id: str,
+    config: dict,
+) -> dict[str, str | list[str] | None]:
+    ...
 ```
+
+### Parse a `.nessus` XML export
+
+```python
+from nessus_parser import load_config, parse_nessus_xml
+
+config  = load_config("config.yaml")
+results = parse_nessus_xml("report.nessus", config)
+
+for r in results:
+    print(r["host"], r["plugin_id"], r["extracted_fields"])
+```
+
+Each entry in the returned list contains:
+
+| Key | Description |
+|---|---|
+| `host` | Hostname from the `<ReportHost>` element |
+| `plugin_id` | Nessus plugin ID string |
+| `plugin_name` | Plugin name from the XML |
+| `port` | Port number |
+| `protocol` | Protocol (`tcp` / `udp`) |
+| `extracted_fields` | `dict` of key → value as returned by `parse_plugin_output` |
+
+---
 
 ## Example Output
 
@@ -250,3 +281,22 @@ cat sample.txt | python nessus_parser.py text -p YOUR_PLUGIN_ID
   Total records : 1
 ==============================================================
 ```
+
+---
+
+## Troubleshooting
+
+**`[ERROR] Config file not found`**
+Pass the correct path with `-c /path/to/config.yaml`.
+
+**`KeyError: Plugin ID 'XXXXX' is not defined`**
+Add a `plugin_id: "XXXXX"` entry to `config.yaml`.
+
+**Field value is `None` or `[]` when you expect a match**
+- Test your regex against the raw plugin text using a tool like [regex101.com](https://regex101.com) (Python flavour).
+- Make sure capture group 1 exists — every pattern needs at least one `( )` group.
+- If the field spans multiple lines, set `multiline: true`.
+- If casing varies, set `ignore_case: true`.
+
+**`[WARNING] Bad regex for key 'X'`**
+The pattern string contains a syntax error. Check for unbalanced parentheses or unescaped backslashes. In YAML, backslashes inside double-quoted strings must be doubled (`\\`).
